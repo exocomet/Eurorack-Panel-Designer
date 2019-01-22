@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-# 
-# Eurorack Panel Designer by THX2112
+#
+# Eurorack Panel Designer by THX2112, Neon22
+# https://github.com/THX2112/Eurorack-Panel-Designer
+# https://github.com/Neon22/Eurorack-Panel-Designer
 #
 # v4
 # - reference: http://www.doepfer.de/a100_man/a100m_e.htm
@@ -10,13 +12,19 @@ import sys
 import math
 
 import inkex
-from simplestyle import *
+import simplestyle
 
-Orange = '#f6921e'
-Blue =   '#0000FF'
-White =  '#FFFFFF'
-lasercut_width = '0.01mm'
-Panel_color = '#e6e6e6'
+
+
+colors = dict(
+    orange = '#f6921e',
+    blue = '#0000ff',
+    red = '#ff0000',
+    grey = '#eeeeee',
+    darkgrey = '#666666',
+    white = '#ffffff',
+    panel_color = '#e6e6e6'
+)
 
 
 class EurorackPanelEffect(inkex.Effect):
@@ -29,97 +37,143 @@ class EurorackPanelEffect(inkex.Effect):
         self.OptionParser.add_option('-v', '--oval', action='store', type='inkbool', dest='oval', default='False', help='Oval holes?')
         self.OptionParser.add_option('-c', '--centers', action='store', type='inkbool', dest='centers', default='False', help='Mark centers?')
         self.OptionParser.add_option('-l', '--lasercut', action='store', type='inkbool', dest='lasercut', default='False', help='Lasercut style?')
+        self.OptionParser.add_option('-w', '--lasercut-width', action='store', type='float', dest='lasercut_width', default='0.01', help='Lasercut width [mm]')
+        self.OptionParser.add_option('-L', '--layers', action='store', type='inkbool', dest='layers', default='False', help='Creates additional layers.')
+        self.OptionParser.add_option('-C', '--components', action='store', type='inkbool', dest='components', default='False', help='Add component templates.')
 
-    def draw_SVG_Panel(self, (w,h), (x,y), (rx,ry), parent):
-        " Draw the Basic Panel Shape"
+        self.panel_root_element = None
+
+
+    def create_layer(self, name):
+        svg = self.document.getroot()
+        newLayer = inkex.etree.SubElement(svg, 'g')
+        newLayer.set(inkex.addNS('label', 'inkscape'), name)
+        newLayer.set(inkex.addNS('groupmode', 'inkscape'), 'layer')
+        return newLayer
+
+
+    def get_style(self, *args, **kwargs):
+        '''Some default style settings'''
+        style = {}
         if self.options.lasercut:
-            stroke = Blue
-            width = lasercut_width
-            fill = 'none'
+            style['stroke'] = colors['blue']
+            style['stroke-width'] = self.options.lasercut_width
+            style['fill'] = 'none'
         else:
-            stroke = 'none'
-            width =  '0mm'
-            fill =   Panel_color
-        #
-        style = { 'stroke'        : stroke,  # 'none',
-                  'stroke-width'  : width,   # '0mm',
-                  'fill'          : fill     # '#e6e6e6'
-                }
-        attr  = { 'style'   : formatStyle(style),
-                  'height'  : str(h),
-                  'width'   : str(w),
-                  'x'       : str(x),
-                  'y'       : str(y),
-                  'rx'      : str(rx),
-                  'ry'      : str(ry)
-                }
-        circ = inkex.etree.SubElement(parent, inkex.addNS('rect','svg'), attr)
+            style['stroke'] = kwargs.get('stroke', colors['darkgrey'])
+            style['stroke-width'] = kwargs.get('strokewidth', '0.0mm')
+            style['fill'] = kwargs.get('fill', colors['white'])
 
-    def draw_SVG_square(self, (w,h), (x,y), (rx,ry), parent):
-        " Draw Oval shaped holes "
-        if self.options.lasercut:
-            stroke = Blue
-            width = lasercut_width
-            fill = 'none'
-        else:
-            stroke = 'none'
-            width =  '0mm'
-            fill =   White
-        style = { 'stroke'        : stroke,   # 'none',
-                  'stroke-width'  : width,   # '0mm',
-                  'fill'          : fill     # '#ffffff'
-                }
-        attr =  { 'style'   : formatStyle(style),
-                  'height'  : str(h),
-                  'width'   : str(w),
-                  'x'       : str(x),
-                  'y'       : str(y),
-                  'rx'      : str(rx),
-                  'ry'      : str(ry)
-                }
-        circ = inkex.etree.SubElement(parent, inkex.addNS('rect','svg'), attr)
-    
-    def draw_SVG_ellipse(self, (rx, ry), (cx, cy), parent, start, end):
-        " Draw Round holes "
-        if self.options.lasercut:
-            stroke = Blue
-            width = lasercut_width
-            fill = 'none'
-        else:
-            stroke = 'none'
-            width =  '0mm'
-            fill =   White
-        style = { 'stroke'        : stroke,   # 'none',
-                  'stroke-width'  : width,   # '0mm',
-                  'fill'          : fill     # '#ffffff'            
-                }
-        ell_attr = {'style' : formatStyle(style),
-                    inkex.addNS('cx','sodipodi')      :str(cx),
-                    inkex.addNS('cy','sodipodi')      :str(cy),
-                    inkex.addNS('rx','sodipodi')      :str(rx),
-                    inkex.addNS('ry','sodipodi')      :str(ry),
-                    inkex.addNS('start','sodipodi')   :str(start),
-                    inkex.addNS('end','sodipodi')     :str(end),
-                    inkex.addNS('open','sodipodi')    :'true',    #all ellipse sectors we will draw are open
-                    inkex.addNS('type','sodipodi')    :'arc'
-                   }
-        ell = inkex.etree.SubElement(parent, inkex.addNS('path','svg'), ell_attr)
+        return simplestyle.formatStyle(style)
 
-    def draw_SVG_line(self,  (x1, y1), (x2, y2), parent):
-        " draw an SVG line segment between the given (raw) points "
-        line_style = { 'stroke'       : Orange,   # '#000000',
-                       'stroke-width' : '.05mm',
-                       'fill'         : 'none'
-                     }
 
-        line_attr =  { 'style'        : formatStyle(line_style),
-                       'd'            : 'M %s,%s L %s,%s' % (x1,y1, x2,y2)
-                     }
-        line = inkex.etree.SubElement(parent, inkex.addNS('path','svg'), line_attr)
+    def draw_SVG_circle(self, x, y, d, parent):
+        attr = {
+            'style': self.get_style(),
+            inkex.addNS('cx', 'sodipodi'): str(x),
+            inkex.addNS('cy', 'sodipodi'): str(y),
+            inkex.addNS('rx', 'sodipodi'): str(d/2),
+            inkex.addNS('ry', 'sodipodi'): str(d/2),
+            inkex.addNS('open', 'sodipodi'): 'false',
+            inkex.addNS('start', 'sodipodi'): str(0),
+            inkex.addNS('end', 'sodipodi'): str(2 * math.pi),
+            inkex.addNS('type', 'sodipodi'): 'arc',
+        }
+        return inkex.etree.SubElement(parent, inkex.addNS('path', 'svg'), attr)
+
+
+
+    def draw_SVG_panel(self, w, h, x, y, rx, ry, parent):
+        """Draw the Basic Panel Shape"""
+        style = self.get_style(fill=colors['panel_color'])
+
+        attr = {
+            'style': style,
+            'height': str(h),
+            'width': str(w),
+            'x': str(x),
+            'y': str(y),
+            'rx': str(rx),
+            'ry': str(ry)
+        }
+        return inkex.etree.SubElement(parent, inkex.addNS('rect', 'svg'), attr)
+
+
+    def draw_SVG_square(self, (w, h), (x, y), (rx, ry), parent):
+        """Draw Oval shaped holes"""
+        style = self.get_style()
+        attr = {
+            'style': style,
+            'height': str(h),
+            'width': str(w),
+            'x': str(x),
+            'y': str(y),
+            'rx': str(rx),
+            'ry': str(ry)
+        }
+        return inkex.etree.SubElement(parent, inkex.addNS('rect', 'svg'), attr)
+
+
+    def draw_SVG_ellipse(self, (rx, ry), (cx, cy), parent):
+        style = self.get_style()
+        ell_attr = {
+            'style': style,
+            inkex.addNS('cx', 'sodipodi'): str(cx),
+            inkex.addNS('cy', 'sodipodi'): str(cy),
+            inkex.addNS('rx', 'sodipodi'): str(rx),
+            inkex.addNS('ry', 'sodipodi'): str(ry),
+            #inkex.addNS('start', 'sodipodi'): str(start),
+            #inkex.addNS('end', 'sodipodi'): str(end),
+            inkex.addNS('open', 'sodipodi'): 'false',
+            inkex.addNS('type', 'sodipodi'): 'arc'
+        }
+        inkex.etree.SubElement(parent, inkex.addNS('path','svg'), ell_attr)
+
+
+    def draw_SVG_line(self, (x1, y1), (x2, y2), parent):
+        style = self.get_style(stroke=colors['orange'], strokewidth='0.2')
+        line_attr = {
+            'style': style,
+            'd': 'M %s,%s L %s,%s' % (x1, y1, x2, y2)
+        }
+        inkex.etree.SubElement(parent, inkex.addNS('path', 'svg'), line_attr)
+
+
+    def draw_center_mark(self, x, y, w=2, h=2):
+        parent = self.panel_root_element
+        self.draw_SVG_line((x-w/2, y), (x+w/2, y), parent)
+        self.draw_SVG_line((x, y+h/2), (x, y-h/2), parent)
+
+
+    def add_potentiometer(self, x, y, d=7):
+        parent = self.panel_root_element
+        p = self.draw_SVG_circle(x, y, d, parent)
+        if self.options.centers:
+            self.draw_center_mark(x, y)
+
+
+    def add_led(self, x, y, d=5):
+        parent = self.panel_root_element
+        self.draw_SVG_circle(x, y, d, parent)
+        if self.options.centers:
+            self.draw_center_mark(x, y)
+
+
+    def add_audiosocket(self, x, y, d=6):
+        parent = self.panel_root_element
+        self.draw_SVG_circle(x, y, d, parent)
+        if self.options.centers:
+            self.draw_center_mark(x, y)
+
+
+    def add_components(self):
+        self.add_potentiometer(10, 20, 6)
+        self.add_led(10, 30, 3)
+        self.add_led(10, 40, 5)
+        self.add_audiosocket(10, 50)
 
 
     def effect(self):
-
         hp = self.options.hp
         symmetrical = self.options.symmetrical
         offset = self.options.offset
@@ -129,48 +183,59 @@ class EurorackPanelEffect(inkex.Effect):
 
         # Dimensions
         height = 128.5
-        if symmetrical: 
+        if symmetrical:
             width = 7.5 + ((hp - 3) * 5.08) + 7.5
         else:
             width = (hp * 5.08) - offset
-        
+
         # Calculate final width and height of panel
         pheight = height * unitfactor
         pwidth =  width * unitfactor
-        
+
         # Build top level group to put everything in
         # Put in in the centre of current view
         group_transform = 'translate(%s,%s)' % (self.view_center[0]-pwidth/2, self.view_center[1]-pheight/2 )
         group_name = 'EuroPanel'
-        group_attribs = {inkex.addNS('label','inkscape'):group_name, 'transform':group_transform }
+        group_attribs = {
+            inkex.addNS('label', 'inkscape'): group_name,
+            'transform': group_transform
+        }
         group = inkex.etree.SubElement(self.current_layer, 'g', group_attribs)
+        self.panel_root_element = group
 
         # Draw Panel
-        self.draw_SVG_Panel((pwidth,pheight), (0,0), (0,0), group)
+        self.draw_SVG_panel(pwidth, pheight, 0, 0, 0, 0, group)
 
-        # Draw Holes
+        ## margins
         TopHoles = 3.0
         BottomHoles = 125.5
         LeftHoles = 7.5
         RightHoles = ((hp - 3.0) * 5.08) + 7.5
         HoleRadius = 1.6
-        #
+
         leftH = LeftHoles * unitfactor
         rightH = RightHoles * unitfactor
         bottomH = BottomHoles * unitfactor
         topH = TopHoles * unitfactor
         holeR = HoleRadius * unitfactor
         gap = holeR/2
-        #        
-        if oval == False:  # Draw Round holes
+
+        if oval == False: # Draw Round holes
             rx = HoleRadius * unitfactor
             ry = rx # circles
-            end = 2 * 3.14159  # full cirlce.
 
-            # Bottom Left
-            self.draw_SVG_ellipse((rx, ry), (leftH, bottomH), group, 0, end)
-            # Top Left
-            self.draw_SVG_ellipse((rx, ry), (leftH, topH), group, 0, end)
+            self.draw_SVG_ellipse((rx, ry), (leftH, bottomH), group)
+            self.draw_SVG_ellipse((rx, ry), (leftH, topH), group)
+
+            # if hp >= 5:
+            #     self.draw_SVG_ellipse((rx, ry), (rightH, bottomH), group)
+            #     self.draw_SVG_ellipse((rx, ry), (rightH, topH), group)
+
+            # if self.options.centers:
+            #     if hp < 5:
+            #         self.draw_center_mark(rx, ry)
+            #     else:
+
 
             # Draw Left-side Centers
             if centers == True:
@@ -187,9 +252,9 @@ class EurorackPanelEffect(inkex.Effect):
             # Draw the Righthand side Mounting holes
             if hp >= 5:
                 # Bottom Right
-                self.draw_SVG_ellipse((rx, ry), (rightH, bottomH), group, 0, end)
+                self.draw_SVG_ellipse((rx, ry), (rightH, bottomH), group)
                 # Top Right
-                self.draw_SVG_ellipse((rx, ry), (rightH, topH), group, 0, end)
+                self.draw_SVG_ellipse((rx, ry), (rightH, topH), group)
                 # Draw Right-side Centers
                 if centers == True:
                     # Bottom Right Centers - Horizontal Line
@@ -232,6 +297,7 @@ class EurorackPanelEffect(inkex.Effect):
                 for i in range(3):
                     self.draw_SVG_line( (leftH+offset, topH+holeR-gap), (leftH+offset, topH-holeR+gap), group)
                     offset += oval_offset
+
             # Draw the Righthand side Mounting holes
             if hp >= 5:
                 # Bottom Right
@@ -258,6 +324,8 @@ class EurorackPanelEffect(inkex.Effect):
                         self.draw_SVG_line( (rightH+offset, topH+holeR-gap), (rightH+offset, topH-holeR+gap), group)
                         offset += oval_offset
 
+        if self.options.components:
+            self.add_components()
 
 
 # Create effect instance and apply it.
