@@ -1,0 +1,27 @@
+# Eurorack Panel Designer
+
+## Installation
+
+Unarchive and copy files to Inkscape's "extensions" directory.
+The exact folder is indicated in:
+
+    Edit -> Preferences -> System: User extensions
+
+Generally it can be found:
+
+Linux:
+
+    ~/.config/inkscape/extensions/ or
+    /usr/share/inkscape/extensions/
+
+Windows:
+
+    type the following into the address line on a File Browser window:
+    %appdata%/inkscape/extensions
+
+Mac OS X:
+
+    /Applications/Inkscape.app/Contents/Resources/share/inkscape/extensions/
+
+
+Extension will show up in Inkscape under `Extensions -> Render -> Eurorack Panel Designer.`
